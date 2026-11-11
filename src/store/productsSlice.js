@@ -8,7 +8,7 @@ export const fetchProducts = createAsyncThunk(
    async (page, { rejectWithValue }) => {
   try {
     // تمرير رقم الصفحة لطلب الـ API
-    const response = await getproductsApi.getproducts();
+    const response = await getproductsApi.getProducts();
     return response.data;// تأكد هل البيانات المرجعة تحتاج .data أم .data.data حسب الـ Backend
   } catch (err) {
     return rejectWithValue(getErrorMessage(err));
@@ -32,7 +32,7 @@ export const fetchFeaturedProducts = createAsyncThunk(
   "products/fetchFeaturedProducts",
   async (_, { rejectWithValue }) => {
     try {
-      const response = await getproductsApi.getproducts({ isFeatured: true });
+      const response = await getproductsApi.getProducts({ isFeatured: true });
       return response.data;
     } catch (err) {
       return rejectWithValue(getErrorMessage(err));

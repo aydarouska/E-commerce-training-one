@@ -11,7 +11,7 @@ import ProductDetails from "./pages/ProductDetails";
 import Cart from "./pages/Cart";
 import NotFound from "./pages/NotFound";
 import { fetchMe } from "./store/authSlice";
-import ProtectedRoute from "./components/ProtectedRoute";
+import ProtectedRoute from "./components/protectedRoute";
 import DashBoard from "./pages/DashBoard";
 
 function App() {
