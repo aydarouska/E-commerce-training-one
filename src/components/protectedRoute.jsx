@@ -1,11 +1,22 @@
 import { useSelector } from "react-redux";
-import { Navigate, Outlet } from "react-router-dom";
+import { Navigate, Outlet, useLocation } from "react-router-dom";
+import Spinner from "./Spinner";
 
-// هذا يقوم بتحديد اذا كان المستخدم مسجل الدخول او لا وده بيتم عن طريق ال user state وده بيتم عن طريق ال extraReducers في authSlice.js
-export default function ProtectedRoute() {
+// بيحمى الصفحات اللى محتاجه تسجيل دخول (السله - الدفع - طلباتى ...)
+// adminOnly = true معناها الصفحه للادمن بس (لوحه التحكم)
+export default function ProtectedRoute({ adminOnly = false }) {
   const { user, initializing } = useSelector((state) => state.auth);
-// هذه الحاله لاشرطيه يقوم بفحص اذا كان هناك token موجود فى localStorage وده بيتم عن طريق ال initializing state وده بيتم عن طريق ال extraReducers في authSlice.js 
-  if (initializing) return null;
-// هذه يكون اذا كان المستخدم مسجل الدخول يتم تحويله الى الصفحة الرئيسية واذا لم يكن مسجل الدخول يتم تحويله الى صفحة تسجيل الدخول وده بيتم عن طريق ال Navigate وده بيتم عن طريق ال Outlet
-  return user ? <Outlet /> : <Navigate to="/login" replace />;
+  const location = useLocation();
+
+  // لسه بنتأكد من التوكن المحفوظ - نستنى و نعرض لودر
+  if (initializing) return <Spinner />;
+
+  // مش مسجل دخول: نوديه لصفحه الدخول و نفتكر هو كان رايح فين عشان نرجعه بعدها
+  if (!user) return <Navigate to="/login" replace state={{ from: location.pathname + location.search }} />;
+
+  // مسجل بس مش ادمن و الصفحه للادمن بس: نرجعه للرئيسيه
+  if (adminOnly && user.role !== "admin") return <Navigate to="/" replace />;
+
+  // كل حاجه تمام: نعرض الصفحه المطلوبه
+  return <Outlet />;
 }

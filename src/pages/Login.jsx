@@ -1,79 +1,60 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import { Link, useNavigate } from "react-router-dom";
-import { loginUser } from "../store/authSlice";
-import "./Auth.css";
+import { Link, useLocation, useNavigate } from "react-router-dom";
+import { loginUser, clearError } from "../store/authSlice";
+import useI18n from "../hooks/useI18n";
+import AuthLayout from "./AuthLayout";
 
+// صفحه تسجيل الدخول
 export default function Login() {
   const dispatch = useDispatch();
   const navigate = useNavigate();
-  const { status, error } = useSelector((state) => state.auth);
-  
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+  const location = useLocation();
+  const { t } = useI18n();
+  const { user, status, error } = useSelector((state) => state.auth);
+  // بيانات الفورم
+  const [form, setForm] = useState({ email: "", password: "" });
+  // الصفحه اللى المستخدم كان رايحلها قبل ما نحوله لتسجيل الدخول
+  const from = location.state?.from || "/";
 
-  const submitting = status === "loading";
+  // اول ما يسجل دخول بنجاح نرجعه للصفحه اللى كان رايحلها
+  useEffect(() => {
+    if (user) navigate(from, { replace: true });
+  }, [user, from, navigate]);
 
-    // const handleSubmit = async (e) => {
-    //   e.preventDefault();
-    //   console.log("Submitting login for:", email); // لتتأكد في الـ Console أن الزر يعمل
-    //   const result = await dispatch(loginUser({ email, password }));
-    //   if (loginUser.fulfilled.match(result)) {
-    //     navigate("/");
-    //   }
-    // };
+  // نمسح اى خطأ قديم لما الصفحه تفتح
+  useEffect(() => {
+    dispatch(clearError());
+  }, [dispatch]);
 
-    // هذا يقوم بتحديد اذا كان المستخدم يقوم بعملية تسجيل الدخول او تسجيل مستخدم جديد او تسجيل خروج وده بيتم عن طريق ال status state وده بيتم عن طريق ال extraReducers في authSlice.js
-    const handleSubmit = async (e) => {
+  const handleChange = (e) => setForm({ ...form, [e.target.name]: e.target.value });
+
+  // ارسال الفورم
+  const handleSubmit = (e) => {
     e.preventDefault();
-
-    try {
-      // إرسال طلب تسجيل الدخول
-      const actionResult = await dispatch(loginUser({ email, password }));
-      
-      // إذا تم التنفيد بنجاح في Redux Toolkit
-      if (loginUser.fulfilled.match(actionResult)) {
-        // حفظ التوكن في localStorage لتأمين الجلسة إن لم يكن يتحفظ تلقائياً
-        const resData = actionResult.payload;
-        const token = resData?.data?.token || resData?.token;
-        if (token) {
-          localStorage.setItem("token", token);
-        }
-
-        // التوجيه فوراً للصفحة الرئيسية
-        navigate("/");
-      } else {
-        console.error("Login failed action:", actionResult);
-      }
-    } catch (err) {
-      console.error("Login exception:", err);
-    }
+    dispatch(loginUser(form));
   };
 
   return (
-    <div className="auth-page">
-      <div className="auth-card">
-        <h1>Welcome back</h1>
-        <p className="auth-subtitle">Log in to your account</p>
-        {error && <div className="error-banner">{error}</div>}
-
-        <form onSubmit={handleSubmit}>
-          
-            <div className="form-field">
-                <label htmlFor="email">Email</label>
-                <input type="email" id="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
-            </div>
-            <div className="form-field">
-                <label htmlFor="password">Password</label>
-                <input type="password" id="password" value={password} onChange={(e) => setPassword(e.target.value)} required />
-            </div>
-
-            <button className="btn" type="submit" >
-                {submitting ? "Logging in..." : "Log in"}
-            </button>
-        </form>
-            <p className="auth-footer">Don't have an account? <Link to="/register">Sign Up</Link></p>
+    <AuthLayout title={t("auth.loginTitle")} subtitle={t("auth.loginSubtitle")}>
+      {/* رساله الخطأ (ايميل او باسورد غلط) */}
+      {error && <div className="alert alert-danger py-2">{error === "NETWORK_ERROR" ? t("error.network") : error}</div>}
+      <form onSubmit={handleSubmit} className="d-grid gap-3">
+        <div>
+          <label className="form-label" htmlFor="email">{t("auth.email")}</label>
+          <input id="email" name="email" type="email" dir="ltr" required className="form-control" value={form.email} onChange={handleChange} autoComplete="email" />
         </div>
-    </div>
+        <div>
+          <label className="form-label" htmlFor="password">{t("auth.password")}</label>
+          <input id="password" name="password" type="password" dir="ltr" required className="form-control" value={form.password} onChange={handleChange} autoComplete="current-password" />
+        </div>
+        <button type="submit" className="btn btn-primary btn-lg" disabled={status === "loading"}>
+          {status === "loading" ? <span className="spinner-border spinner-border-sm" /> : t("nav.login")}
+        </button>
+      </form>
+      <p className="text-center mt-3 mb-0 small">
+        {t("auth.noAccount")} <Link to="/register" state={{ from }}>{t("nav.register")}</Link>
+      </p>
+    </AuthLayout>
   );
 }

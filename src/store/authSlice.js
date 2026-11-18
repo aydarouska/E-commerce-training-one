@@ -1,122 +1,120 @@
-import {createAsyncThunk, createSlice} from '@reduxjs/toolkit';
-import * as AuthApi from '../api/auth';
+import { createAsyncThunk, createSlice } from "@reduxjs/toolkit";
+import * as AuthApi from "../api/auth";
 import { getErrorMessage } from "../api/errors";
 
-
+// تسجيل الدخول: بيرجع { user, token } ونخزن التوكن في localStorage
 export const loginUser = createAsyncThunk(
-    "auth/login", 
-    async ({email, password}, {rejectWithValue}) => {
-        try {
-            const res = await AuthApi.login({email, password});
-            return res.data;// تم تعديلها منdata.data الى data لانها كانت تعيد كائن يحتوي على data وداخلها data اخرى
-        } catch (error) {
-            return rejectWithValue(getErrors(error));
-        }
+  "auth/login",
+  async ({ email, password }, { rejectWithValue }) => {
+    try {
+      const res = await AuthApi.login({ email, password });
+      return res.data.data;
+    } catch (error) {
+      return rejectWithValue(getErrorMessage(error));
     }
-)
+  }
+);
 
+// إنشاء حساب جديد
 export const registerUser = createAsyncThunk(
-    "auth/register", 
-    async ({name, email, password}, {rejectWithValue}) => {
-        try {
-            const res = await AuthApi.register({name, email, password});
-            return res.data.data;// تم تعديلها منdata.data الى data لانها كانت تعيد كائن يحتوي على data وداخلها data اخرى 
-        } catch (error) {
-            return rejectWithValue(getErrors(error));
-        }
-    },
+  "auth/register",
+  async ({ name, email, password }, { rejectWithValue }) => {
+    try {
+      const res = await AuthApi.register({ name, email, password });
+      return res.data.data;
+    } catch (error) {
+      return rejectWithValue(getErrorMessage(error));
+    }
+  }
 );
 
-export const fetchMe = createAsyncThunk(
-    "auth/fetchMe",
-    async (_, {rejectWithValue}) => {
-        try {
-            const res = await AuthApi.getMe();
-            return res.data.data.user;
-        } catch (error) {
-            return rejectWithValue(getErrors(error));
-        }
-    },
-);
+// جلب بيانات المستخدم الحالي لو فيه توكن محفوظ (عند فتح الموقع)
+export const fetchMe = createAsyncThunk("auth/fetchMe", async (_, { rejectWithValue }) => {
+  try {
+    const res = await AuthApi.getMe();
+    return res.data.data.user;
+  } catch (error) {
+    return rejectWithValue(getErrorMessage(error));
+  }
+});
 
-export const logoutUser = createAsyncThunk(
-    "auth/logout",
-    async () => {
-        await AuthApi.logout();
-    });
+// تسجيل الخروج: الخروج الحقيقي هو مسح التوكن من المتصفح
+export const logoutUser = createAsyncThunk("auth/logout", async () => {
+  try {
+    await AuthApi.logout();
+  } catch {
+    /* حتى لو الطلب فشل بنعمل خروج من المتصفح عادى */
+  }
+});
 
-const initialState  = {
-    user: null,
-    initializing: Boolean(localStorage.getItem("token")),
-    status: "idle",
-    error: null,
+const hasToken = () => {
+  try {
+    return Boolean(localStorage.getItem("token"));
+  } catch {
+    return false;
+  }
+};
+
+const initialState = {
+  user: null,
+  // true أثناء التحقق من التوكن عند أول تحميل للموقع
+  initializing: hasToken(),
+  status: "idle",
+  error: null,
+};
+
+const setSession = (state, action) => {
+  state.status = "succeeded";
+  state.user = action.payload.user;
+  localStorage.setItem("token", action.payload.token);
 };
 
 const authSlice = createSlice({
-    name: "auth",
-    initialState ,
-   //   , و ده بيتم عن طريق redducers error state هى اشياء ليس علاقه بالسيرفر يعنى مثلا لو المستخدم ضغط على زر تسجيل الدخول وحدث خطأ فى البيانات المدخله يعنى مثلا الايميل او الباسورد غلط هيتم تخزين الخطأ فى ال state وده بيتم عن طريق ال reducers
-    reducers: {
-        clearError: (state) => {
-            state.error = null;
-        },
+  name: "auth",
+  initialState,
+  reducers: {
+    clearError: (state) => {
+      state.error = null;
     },
-   // هدى اشياء لها علاقه بالسيرفر يعنى مثلا لو المستخدم ضغط على زر تسجيل الدخول وحدث خطأ فى البيانات المدخله يعنى مثلا الايميل او الباسورد غلط هيتم تخزين الخطأ فى 
-    extraReducers: (builder) => {
-        builder
-//دى الحاله بتاعه تسجيل الدخول 
-            .addCase(loginUser.pending, (state) => {
-                state.status = "loading";
-                state.error = null;
-            })
-            .addCase(loginUser.fulfilled, (state, action) => {
-                state.status = "succeeded";
-                state.user = action.payload.user;
-                localStorage.setItem("token", action.payload.token);
-            })
-            .addCase(loginUser.rejected, (state, action) => {
-                state.status = "failed";
-                state.error = action.payload;
-            })
-//دى الحاله بتاعه تسجيل مستخدم جديد
-            .addCase(registerUser.pending, (state) => {
-                state.status = "loading";
-                state.error = null;
-            })
-            .addCase(registerUser.fulfilled, (state, action) => {
-                state.status = "succeeded";
-                state.user = action.payload.user;
-                localStorage.setItem("token", action.payload.token);
-            })
-            .addCase(registerUser.rejected, (state, action) => {
-                state.status = "failed";
-                state.error = action.payload;
-            })
-//دى الحاله بتاعه جلب بيانات المستخدم الحالي بعد تسجيل الدخول مثلا فى حاله الضغط على البروفايل
-            .addCase(fetchMe.pending, (state) => {
-                state.initializing  = true;
-                state.error = null;
-            })
-            .addCase(fetchMe.fulfilled, (state, action) => {
-                state.initializing = false;
-                state.user = action.payload;
-            })
-            .addCase(fetchMe.rejected, (state) => {
-                state.initializing = false;
-                state.user = null;
-                localStorage.removeItem("token");
-            })
-//دى الحاله بتاعه تسجيل خروج المستخدم و بتنجح اذا تم تسجيل  الخروج بنجاح و بتفشل اذا حدث خطأ فى تسجيل الخروج 
-            .addCase(logoutUser.fulfilled, (state) => {
-                state.user = null;
-                state.status = "idle";
-                localStorage.removeItem("token");
-            })
-            .addCase(logoutUser.rejected, (state) => {
-                state.user = null;
-                localStorage.removeItem("token");
-            });
-    },
+  },
+  extraReducers: (builder) => {
+    builder
+      .addCase(loginUser.pending, (state) => {
+        state.status = "loading";
+        state.error = null;
+      })
+      .addCase(loginUser.fulfilled, setSession)
+      .addCase(loginUser.rejected, (state, action) => {
+        state.status = "failed";
+        state.error = action.payload;
+      })
+      .addCase(registerUser.pending, (state) => {
+        state.status = "loading";
+        state.error = null;
+      })
+      .addCase(registerUser.fulfilled, setSession)
+      .addCase(registerUser.rejected, (state, action) => {
+        state.status = "failed";
+        state.error = action.payload;
+      })
+      .addCase(fetchMe.pending, (state) => {
+        state.initializing = true;
+      })
+      .addCase(fetchMe.fulfilled, (state, action) => {
+        state.initializing = false;
+        state.user = action.payload;
+      })
+      .addCase(fetchMe.rejected, (state) => {
+        state.initializing = false;
+        state.user = null;
+        localStorage.removeItem("token");
+      })
+      .addCase(logoutUser.fulfilled, (state) => {
+        state.user = null;
+        state.status = "idle";
+        localStorage.removeItem("token");
+      });
+  },
 });
 
 export const { clearError } = authSlice.actions;

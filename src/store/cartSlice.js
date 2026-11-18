@@ -84,8 +84,8 @@ const cartSlice = createSlice({
   name: "cart",
   initialState,
   reducers: {
-    // Resets the locally-held cart without touching the server copy —
-    // used on logout so the next user never sees the previous user's items.
+    // بيفضى السله من المتصفح بس (من غير ما يلمس السله اللى فى السيرفر)
+    // بنستخدمها عند تسجيل الخروج عشان اللى يدخل بعده مايشوفش سله الشخص اللى قبله
     resetCart: (state) => {
       state.cart = emptyCart;
       state.status = "idle";

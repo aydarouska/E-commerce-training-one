@@ -1,58 +1,108 @@
 import { useEffect } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import { Routes, Route } from "react-router-dom";
+import { Routes, Route, useLocation } from "react-router-dom";
 import { fetchCart, resetCart } from "./store/cartSlice";
+import { fetchMe } from "./store/authSlice";
+import { fetchSettings } from "./store/settingsSlice";
+import { applyBootstrapDirection } from "./utils/bootstrapDirection";
+import useI18n from "./hooks/useI18n";
 import Navbar from "./components/Navbar";
 import CategoryBar from "./components/CategoryBar";
-import Login from "./pages/Login";
-import Register from "./pages/Register";
+import Footer from "./components/Footer";
+import ProtectedRoute from "./components/protectedRoute";
 import Home from "./pages/Home";
 import ProductDetails from "./pages/ProductDetails";
 import Cart from "./pages/Cart";
+import Checkout from "./pages/Checkout";
+import OrderDetails from "./pages/OrderDetails";
+import MyOrders from "./pages/MyOrders";
+import PaymentResult from "./pages/PaymentResult";
+import Account from "./pages/DashBoard";
+import Login from "./pages/Login";
+import Register from "./pages/Register";
 import NotFound from "./pages/NotFound";
-import { fetchMe } from "./store/authSlice";
-import ProtectedRoute from "./components/protectedRoute";
-import DashBoard from "./pages/DashBoard";
+import AdminLayout from "./admin/AdminLayout";
+import AdminOverview from "./admin/AdminOverview";
+import AdminProducts from "./admin/AdminProducts";
+import AdminOrders from "./admin/AdminOrders";
+import AdminUsers from "./admin/AdminUsers";
+import AdminSettings from "./admin/AdminSettings";
 
 function App() {
   const dispatch = useDispatch();
-const { user } = useSelector((state) => state.auth || {});
+  const { user } = useSelector((state) => state.auth);
+  const { lang, dir, t } = useI18n();
+  const location = useLocation();
 
-// هذا يقوم بفحص اذا كان هناك token موجود فى localStorage وده بيتم عن طريق ال useEffect وده بيتم عن طريق ال dispatch وده بيتم عن طريق ال fetchMe في authSlice.js
+  // اول ما الموقع يفتح: لو فيه token محفوظ فى localStorage نجيب بيانات المستخدم
+  // و كمان نجيب اعدادات المتجر (سعر الدولار - مصاريف الشحن - طرق الدفع)
   useEffect(() => {
-    if (localStorage.getItem("token")) {
-      dispatch(fetchMe());
-    }
+    if (localStorage.getItem("token")) dispatch(fetchMe());
+    dispatch(fetchSettings());
   }, [dispatch]);
 
-  // The cart lives in the DB per user — load it once we know who's logged
-  // in, and wipe the locally-held copy on logout so it never leaks into
-  // the next person's session.
+  // السله محفوظه فى قاعده البيانات لكل مستخدم:
+  // لو فيه مستخدم نجيب سلته - و لو عمل خروج نفضى السله من المتصفح
   useEffect(() => {
-    if (user) {
-      dispatch(fetchCart());
-    } else {
-      dispatch(resetCart());
-    }
+    if (user) dispatch(fetchCart());
+    else dispatch(resetCart());
   }, [user, dispatch]);
+
+  // كل ما اللغه تتغير: نغير اتجاه الصفحه (rtl/ltr) و ملف bootstrap و عنوان التاب
+  useEffect(() => {
+    document.documentElement.lang = lang;
+    document.documentElement.dir = dir;
+    applyBootstrapDirection(dir);
+  }, [lang, dir]);
+
+  // لما الصفحه تتغير نطلع لفوق (الا لو الرابط فيه # زى #products)
+  useEffect(() => {
+    if (!location.hash) window.scrollTo(0, 0);
+  }, [location.pathname, location.hash]);
+
+  // صفحات لوحه التحكم ليها شكل مختلف (من غير شريط التصنيفات)
+  const isAdmin = location.pathname.startsWith("/admin");
 
   return (
     <>
       <Navbar />
-      <CategoryBar />
-      <Routes>
-        {/* الصفحة الافتراضية لعرض المنتجات */}
-        <Route element={<ProtectedRoute />}>
-          <Route path="/" element={<DashBoard />} />
-        </Route>
-        {/* باقي الصفحات */}
-        <Route path="/" element={<Home />} />
-        <Route path="/products/:id" element={<ProductDetails />} />
-        <Route path="/cart" element={<Cart />} />
-        <Route path="/login" element={<Login />} />
-        <Route path="/register" element={<Register />} />
-        <Route path="*" element={<NotFound />} />
-      </Routes>
+      {!isAdmin && <CategoryBar />}
+      <main>
+        <Routes>
+          {/* صفحات متاحه لاى حد */}
+          <Route path="/" element={<Home />} />
+          <Route path="/products/:id" element={<ProductDetails />} />
+          <Route path="/login" element={<Login />} />
+          <Route path="/register" element={<Register />} />
+
+          {/* صفحات محتاجه تسجيل دخول */}
+          <Route element={<ProtectedRoute />}>
+            <Route path="/cart" element={<Cart />} />
+            <Route path="/checkout" element={<Checkout />} />
+            <Route path="/orders" element={<MyOrders />} />
+            <Route path="/orders/:id" element={<OrderDetails />} />
+            <Route path="/payment/result" element={<PaymentResult />} />
+            <Route path="/account" element={<Account />} />
+          </Route>
+
+          {/* لوحه التحكم - للادمن بس */}
+          <Route element={<ProtectedRoute adminOnly />}>
+            <Route path="/admin" element={<AdminLayout />}>
+              <Route index element={<AdminOverview />} />
+              <Route path="products" element={<AdminProducts />} />
+              <Route path="orders" element={<AdminOrders />} />
+              <Route path="users" element={<AdminUsers />} />
+              <Route path="settings" element={<AdminSettings />} />
+            </Route>
+          </Route>
+
+          {/* اى رابط غير معروف */}
+          <Route path="*" element={<NotFound />} />
+        </Routes>
+      </main>
+      {!isAdmin && <Footer />}
+      {/* عنوان التاب فى المتصفح */}
+      <title>{t("brand")}</title>
     </>
   );
 }

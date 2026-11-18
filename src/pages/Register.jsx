@@ -1,61 +1,69 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
+import { registerUser, clearError } from "../store/authSlice";
+import useI18n from "../hooks/useI18n";
+import AuthLayout from "./AuthLayout";
 
-import { registerUser } from "../store/authSlice";
-import "./Auth.css";
-
+// صفحه انشاء حساب جديد
 export default function Register() {
   const dispatch = useDispatch();
   const navigate = useNavigate();
-  const { status, error } = useSelector((state) => state.auth);
-  
-  const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+  const location = useLocation();
+  const { t } = useI18n();
+  const { user, status, error } = useSelector((state) => state.auth);
+  const [form, setForm] = useState({ name: "", email: "", password: "" });
+  // خطأ محلى (قبل الارسال للسيرفر)
+  const [localError, setLocalError] = useState("");
+  const from = location.state?.from || "/";
 
-  // هذا يقوم بتحديد اذا كان المستخدم يقوم بعملية تسجيل الدخول او تسجيل مستخدم جديد او تسجيل خروج وده بيتم عن طريق ال status state وده بيتم عن طريق ال extraReducers في authSlice.js
-  const submitting = status === "loading";
+  // بعد انشاء الحساب بنجاح المستخدم بيبقى مسجل دخول تلقائى فنحوله
+  useEffect(() => {
+    if (user) navigate(from, { replace: true });
+  }, [user, from, navigate]);
 
-    const handleSubmit = async (e) => {
-      // هذا يقوم بمنع الصفحة من التحديث عند الضغط على زر تسجيل الدخول وده بيتم عن طريق ال preventDefault() method
-      e.preventDefault();
-      const result = await dispatch(registerUser({ name, email, password }));
-      // هذا يقوم بتحديد اذا كان المستخدم قام بتسجيل مستخدم جديد بنجاح وده بيتم عن طريق استخدام ال match method وده بيتم عن طريق ال registerUser async thunk
-      if (registerUser.fulfilled.match(result)) {
-        navigate("/");
-      }
-    };
+  useEffect(() => {
+    dispatch(clearError());
+  }, [dispatch]);
+
+  const handleChange = (e) => {
+    setForm({ ...form, [e.target.name]: e.target.value });
+    setLocalError("");
+  };
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    // الباسورد لازم 6 حروف على الاقل (نفس شرط السيرفر)
+    if (form.password.length < 6) return setLocalError(t("auth.passwordMin"));
+    dispatch(registerUser(form));
+  };
+
+  const shownError = localError || (error === "NETWORK_ERROR" ? t("error.network") : error);
 
   return (
-    <div className="auth-page">
-      <div className="auth-card">
-        <h1>Create an account</h1>
-        <p className="auth-subtitle">Sign up to get started</p>
-        {error && <div className="error-banner">{typeof error === 'object' ? error.message : error}</div>}
-        <form onSubmit={handleSubmit}>
-            <div className="form-field">
-                <label htmlFor="name">Name</label>
-                <input type="text" id="name" value={name} onChange={(e) => setName(e.target.value)} required />
-            </div>
-            <div className="form-field">
-                <label htmlFor="email">Email</label>
-                <input type="email" id="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
-            </div>
-            <div className="form-field">
-                <label htmlFor="password">Password</label>
-                <input type="password" id="password" value={password} onChange={(e) => setPassword(e.target.value)} required />
-            </div>
-
-            <button className="btn" type="submit" disabled={submitting}>
-                {submitting ? "Creating account..." : "Sign Up"}
-            </button>
-        </form>
-            <p className="auth-footer">Already have an account? <Link to="/login">Login</Link></p>
+    <AuthLayout title={t("auth.registerTitle")} subtitle={t("auth.registerSubtitle")}>
+      {shownError && <div className="alert alert-danger py-2">{shownError}</div>}
+      <form onSubmit={handleSubmit} className="d-grid gap-3">
+        <div>
+          <label className="form-label" htmlFor="name">{t("auth.name")}</label>
+          <input id="name" name="name" required className="form-control" value={form.name} onChange={handleChange} autoComplete="name" />
         </div>
-    </div>
+        <div>
+          <label className="form-label" htmlFor="email">{t("auth.email")}</label>
+          <input id="email" name="email" type="email" dir="ltr" required className="form-control" value={form.email} onChange={handleChange} autoComplete="email" />
+        </div>
+        <div>
+          <label className="form-label" htmlFor="password">{t("auth.password")}</label>
+          <input id="password" name="password" type="password" dir="ltr" required className="form-control" value={form.password} onChange={handleChange} autoComplete="new-password" />
+          <div className="form-text">{t("auth.passwordMin")}</div>
+        </div>
+        <button type="submit" className="btn btn-primary btn-lg" disabled={status === "loading"}>
+          {status === "loading" ? <span className="spinner-border spinner-border-sm" /> : t("auth.createAccount")}
+        </button>
+      </form>
+      <p className="text-center mt-3 mb-0 small">
+        {t("auth.haveAccount")} <Link to="/login" state={{ from }}>{t("nav.login")}</Link>
+      </p>
+    </AuthLayout>
   );
 }
-    
-
-

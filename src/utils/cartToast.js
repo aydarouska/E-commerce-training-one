@@ -1,26 +1,6 @@
-import Swal from "sweetalert2";
+// الملف ده قديم - سايبينه عشان لو فيه ملف لسه بيستورد منه مايحصلش خطأ
+// الرسايل الجديده كلها فى utils/toast.js
+import { toastError, toastSuccess } from "./toast";
 
-export const cartToast = Swal.mixin({
-  toast: true,
-  position: "top-end",
-  showConfirmButton: false,
-  timer: 1800,
-  timerProgressBar: true,
-  didOpen: (toast) => {
-    toast.addEventListener("mouseenter", Swal.stopTimer);
-    toast.addEventListener("mouseleave", Swal.resumeTimer);
-  },
-});
-
-export const notifyAddedToCart = (productName) =>
-  cartToast.fire({
-    icon: "success",
-    title: `${productName} added to cart`,
-  });
-
- export const notifyCartError = (message) =>
-  cartToast.fire({
-    icon: "error",
-    title: message || "Couldn't update your cart",
-  });
- 
+export const notifyAddedToCart = (message) => toastSuccess(message);
+export const notifyCartError = (message) => toastError(message);

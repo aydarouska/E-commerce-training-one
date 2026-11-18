@@ -1,218 +1,156 @@
-import { useEffect } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import { Link } from "react-router-dom";
-import {
-  fetchCart,
-  selectCartItems,
-  selectCartTotal,
-  removeFromCart,
-  updateQuantity,
-  clearCart,
-} from "../store/cartSlice";
+import { Link, useNavigate } from "react-router-dom";
+import { updateQuantity, removeFromCart, clearCart, selectCartItems, selectCartTotal } from "../store/cartSlice";
 import { resolveProductImage } from "../utils/image";
-import { notifyCartError } from "../utils/cartToast";
+import { toastError, confirmDialog } from "../utils/toast";
+import useI18n from "../hooks/useI18n";
+import Spinner from "../components/Spinner";
+import Icon from "../components/Icon";
 
-function EmptyCart() {
-  return (
-    <div className="mx-auto flex max-w-md flex-col items-center rounded-2xl border border-slate-200 bg-white px-8 py-16 text-center shadow-sm">
-      <div className="flex h-16 w-16 items-center justify-center rounded-full bg-indigo-50">
-        <svg
-          viewBox="0 0 24 24"
-          className="h-8 w-8 text-indigo-500"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="1.5"
-          aria-hidden="true"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            d="M2.25 3h1.386c.51 0 .955.343 1.087.836l.383 1.437M7.5 14.25a3 3 0 0 0-3 3h15.75m-12.75-3h11.218c1.121-2.3 1.994-4.694 2.602-7.152.096-.39-.207-.752-.612-.752H5.106M7.5 14.25 5.106 5.383M6 18.75a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0Zm12.75 0a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0Z"
-          />
-        </svg>
-      </div>
-      <h1 className="mt-5 text-xl font-bold text-slate-900">Your cart is empty</h1>
-      <p className="mt-2 text-sm text-slate-500">
-        Looks like you haven't added anything yet. Start browsing to fill it up.
-      </p>
-      <Link
-        to="/"
-        className="mt-6 inline-flex items-center justify-center rounded-lg bg-indigo-600 px-6 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-indigo-700"
-      >
-        Browse products
-      </Link>
-    </div>
-  );
-}
+// حساب مصاريف الشحن حسب اعدادات المتجر (بتستخدم هنا و فى صفحه الدفع)
+export const calcShipping = (subtotal, settings) => {
+  if (!settings) return 0;
+  // لو فيه حد للشحن المجانى و الطلب وصله يبقى الشحن ببلاش
+  if (settings.freeShippingThreshold > 0 && subtotal >= settings.freeShippingThreshold) return 0;
+  return settings.shippingFee || 0;
+};
 
+// صفحه سله المشتريات
 export default function Cart() {
   const dispatch = useDispatch();
+  const navigate = useNavigate();
+  const { t, tr, price } = useI18n();
+  // المنتجات اللى فى السله و الاجمالى
   const items = useSelector(selectCartItems);
-  const total = useSelector(selectCartTotal);
+  const subtotal = useSelector(selectCartTotal);
   const status = useSelector((state) => state.cart.status);
+  const settings = useSelector((state) => state.settings.data);
 
-  useEffect(() => {
-    dispatch(fetchCart());
-  }, [dispatch]);
+  const shipping = calcShipping(subtotal, settings);
+  // كام فاضل عشان الشحن يبقى مجانى (لو الميزه دى شغاله)
+  const remainingForFree =
+    settings?.freeShippingThreshold > 0 ? Math.max(settings.freeShippingThreshold - subtotal, 0) : 0;
 
-  const handleUpdateQuantity = (productId, quantity) => {
+  // تغيير الكميه - لو حصل خطأ (مثلا الكميه اكبر من المخزن) نعرض رساله
+  const changeQty = (productId, quantity) => {
+    if (quantity < 1) return;
     dispatch(updateQuantity({ productId, quantity }))
       .unwrap()
-      .catch((message) => notifyCartError(message));
+      .catch((msg) => toastError(msg));
   };
 
-  const handleRemove = (productId) => {
-    dispatch(removeFromCart(productId))
-      .unwrap()
-      .catch((message) => notifyCartError(message));
+  // تفضيه السله بعد تأكيد المستخدم
+  const handleClear = async () => {
+    const ok = await confirmDialog({
+      title: t("cart.clearConfirm"),
+      confirmText: t("common.yes"),
+      cancelText: t("common.cancel"),
+      danger: true,
+    });
+    if (ok) dispatch(clearCart());
   };
 
-  const handleClear = () => {
-    dispatch(clearCart())
-      .unwrap()
-      .catch((message) => notifyCartError(message));
-  };
+  // اول تحميل للسله
+  if (status === "loading" && !items.length) return <Spinner />;
+
+  // السله فاضيه
+  if (!items.length) {
+    return (
+      <div className="container py-5 text-center">
+        <span className="tw:inline-flex tw:h-20 tw:w-20 tw:items-center tw:justify-center tw:rounded-full bg-brand-soft text-brand mb-3">
+          <Icon name="cart" size={40} />
+        </span>
+        <h1 className="h4 fw-bold">{t("cart.empty")}</h1>
+        <p className="text-secondary">{t("cart.emptyText")}</p>
+        <Link to="/" className="btn btn-primary">{t("cart.continue")}</Link>
+      </div>
+    );
+  }
 
   return (
-    <div className="bg-slate-50">
-      <div className="container py-8 lg:py-12">
-        <h1 className="text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">
-          Your Cart
-        </h1>
+    <div className="container py-4">
+      <div className="d-flex justify-content-between align-items-center mb-3">
+        <h1 className="h4 fw-bold mb-0">{t("cart.title")} ({items.length})</h1>
+        <button type="button" className="btn btn-link text-danger text-decoration-none" onClick={handleClear}>
+          <Icon name="trash" size={16} /> {t("cart.clear")}
+        </button>
+      </div>
 
-        {status === "loading" && items.length === 0 ? (
-          <p className="mt-6 text-sm text-slate-500">Loading your cart...</p>
-        ) : items.length === 0 ? (
-          <div className="mt-6">
-            <EmptyCart />
-          </div>
-        ) : (
-          <div className="mt-6 grid grid-cols-1 gap-8 lg:grid-cols-3">
-            <div className="lg:col-span-2">
-              <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-                <ul className="divide-y divide-slate-100">
-                  {items.map((item) => (
-                    <li key={item.product.id} className="flex items-center gap-4 p-4 sm:p-5">
-                      <Link
-                        to={`/products/${item.product.id}`}
-                        className="h-20 w-20 shrink-0 overflow-hidden rounded-xl border border-slate-200 bg-white"
-                      >
-                        <img
-                          src={resolveProductImage(item.product.image)}
-                          alt={item.product.name}
-                          className="h-full w-full object-cover"
-                        />
+      <div className="row g-4">
+        {/* قائمه المنتجات */}
+        <div className="col-lg-8">
+          <div className="card">
+            <ul className="list-group list-group-flush">
+              {items.map(({ product, quantity, subtotal: lineTotal }) => (
+                <li key={product.id} className="list-group-item py-3">
+                  <div className="d-flex gap-3">
+                    {/* صوره المنتج */}
+                    <Link to={`/products/${product.id}`} className="tw:shrink-0">
+                      <img src={resolveProductImage(product.image)} alt={tr(product, "name")} className="rounded tw:h-20 tw:w-20 tw:object-cover" />
+                    </Link>
+                    <div className="flex-grow-1">
+                      {/* الاسم و سعر الوحده */}
+                      <Link to={`/products/${product.id}`} className="fw-semibold text-reset text-decoration-none">
+                        {tr(product, "name")}
                       </Link>
+                      <div className="small text-secondary">{price(product.price)} / {t("cart.unit")}</div>
 
-                      <div className="min-w-0 flex-1">
-                        <Link
-                          to={`/products/${item.product.id}`}
-                          className="line-clamp-2 text-sm font-semibold text-slate-900 hover:text-indigo-600"
-                        >
-                          {item.product.name}
-                        </Link>
-                        <p className="mt-1 text-sm text-slate-500">
-                          ${item.product.price.toFixed(2)}
-                        </p>
+                      <div className="d-flex flex-wrap justify-content-between align-items-center gap-2 mt-2">
+                        {/* زرار - و + لتغيير الكميه */}
+                        <div className="input-group input-group-sm tw:w-32">
+                          <button type="button" className="btn btn-outline-secondary" disabled={quantity <= 1} onClick={() => changeQty(product.id, quantity - 1)} aria-label="-">
+                            <Icon name="minus" size={14} />
+                          </button>
+                          <input type="text" readOnly className="form-control text-center" value={quantity} aria-label={t("product.quantity")} />
+                          <button type="button" className="btn btn-outline-secondary" disabled={quantity >= product.countInStock} onClick={() => changeQty(product.id, quantity + 1)} aria-label="+">
+                            <Icon name="plus" size={14} />
+                          </button>
+                        </div>
+                        {/* اجمالى السطر و زرار الحذف */}
+                        <div className="d-flex align-items-center gap-3">
+                          <span className="price">{price(lineTotal)}</span>
+                          <button type="button" className="btn btn-sm btn-light text-danger" onClick={() => dispatch(removeFromCart(product.id))} aria-label={t("cart.remove")}>
+                            <Icon name="trash" size={16} />
+                          </button>
+                        </div>
                       </div>
+                    </div>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
 
-                      <div className="flex items-center rounded-xl border border-slate-200 bg-white">
-                        <button
-                          type="button"
-                          onClick={() =>
-                            handleUpdateQuantity(item.product.id, item.quantity - 1)
-                          }
-                          disabled={item.quantity <= 1}
-                          aria-label="Decrease quantity"
-                          className="flex h-10 w-10 items-center justify-center text-lg text-slate-600 transition-colors hover:text-indigo-600 disabled:cursor-not-allowed disabled:text-slate-300"
-                        >
-                          −
-                        </button>
-                        <span className="w-8 text-center text-sm font-semibold text-slate-900">
-                          {item.quantity}
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() =>
-                            handleUpdateQuantity(item.product.id, item.quantity + 1)
-                          }
-                          disabled={item.quantity >= item.product.countInStock}
-                          aria-label="Increase quantity"
-                          className="flex h-10 w-10 items-center justify-center text-lg text-slate-600 transition-colors hover:text-indigo-600 disabled:cursor-not-allowed disabled:text-slate-300"
-                        >
-                          +
-                        </button>
-                      </div>
-
-                      <p className="w-20 shrink-0 text-right text-sm font-semibold text-slate-900">
-                        ${item.subtotal.toFixed(2)}
-                      </p>
-
-                      <button
-                        type="button"
-                        onClick={() => handleRemove(item.product.id)}
-                        aria-label={`Remove ${item.product.name}`}
-                        className="shrink-0 rounded-lg p-2 text-slate-400 transition-colors hover:bg-red-50 hover:text-red-600"
-                      >
-                        <svg
-                          viewBox="0 0 24 24"
-                          className="h-5 w-5"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="1.5"
-                          aria-hidden="true"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            d="M6 7.5h12M9.75 7.5V5.25a1.5 1.5 0 0 1 1.5-1.5h1.5a1.5 1.5 0 0 1 1.5 1.5V7.5m-7.5 0 .662 11.26a2 2 0 0 0 2 1.99h5.176a2 2 0 0 0 2-1.99L17.25 7.5"
-                          />
-                        </svg>
-                      </button>
-                    </li>
-                  ))}
-                </ul>
+        {/* ملخص الطلب */}
+        <div className="col-lg-4">
+          <div className="card tw:sticky tw:top-24">
+            <div className="card-body">
+              <h2 className="h5 fw-bold mb-3">{t("cart.summary")}</h2>
+              <div className="d-flex justify-content-between mb-2">
+                <span>{t("cart.subtotal")}</span>
+                <span>{price(subtotal)}</span>
               </div>
-
-              <button
-                type="button"
-                onClick={handleClear}
-                className="mt-4 text-sm font-medium text-slate-500 transition-colors hover:text-red-600"
-              >
-                Clear cart
+              <div className="d-flex justify-content-between mb-2">
+                <span>{t("cart.shipping")}</span>
+                <span>{shipping === 0 ? <span className="text-success">{t("cart.free")}</span> : price(shipping)}</span>
+              </div>
+              {/* رساله "فاضلك كذا للشحن المجانى" */}
+              {remainingForFree > 0 && (
+                <div className="alert alert-warning py-2 small">{t("cart.freeShippingHint", { amount: price(remainingForFree) })}</div>
+              )}
+              <hr />
+              <div className="d-flex justify-content-between fw-bold fs-5 mb-3">
+                <span>{t("cart.total")}</span>
+                <span className="price">{price(subtotal + shipping)}</span>
+              </div>
+              <button type="button" className="btn btn-primary btn-lg w-100" onClick={() => navigate("/checkout")}>
+                {t("cart.checkout")}
               </button>
-            </div>
-
-            <div className="lg:sticky lg:top-24 lg:self-start">
-              <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-                <h2 className="text-lg font-bold text-slate-900">Order Summary</h2>
-
-                <div className="mt-4 flex items-center justify-between text-sm">
-                  <span className="text-slate-500">
-                    Subtotal ({items.reduce((sum, i) => sum + i.quantity, 0)} items)
-                  </span>
-                  <span className="font-semibold text-slate-900">${total.toFixed(2)}</span>
-                </div>
-
-                <div className="my-4 h-px w-full bg-slate-200" />
-
-                <div className="flex items-center justify-between">
-                  <span className="text-base font-bold text-slate-900">Total</span>
-                  <span className="text-xl font-bold text-slate-900">
-                    ${total.toFixed(2)}
-                  </span>
-                </div>
-
-                <button
-                  type="button"
-                  className="mt-6 flex h-12 w-full items-center justify-center rounded-xl bg-indigo-600 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-indigo-700"
-                >
-                  Proceed to Checkout
-                </button>
-              </div>
+              <Link to="/" className="btn btn-link w-100 mt-1">{t("cart.continue")}</Link>
             </div>
           </div>
-        )}
+        </div>
       </div>
     </div>
   );

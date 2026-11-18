@@ -1,92 +1,86 @@
 import { Link } from "react-router-dom";
-// تصحيح المسار للخروج من components ثم الوصول إلى utils
 import { resolveProductImage } from "../utils/image";
+import useI18n from "../hooks/useI18n";
+import useAddToCart from "../hooks/useAddToCart";
+import Icon from "./Icon";
 
-const stockInfo = (countInStock) => {
-  if (countInStock === 0) return { label: "Out of stock", className: "text-red-600" };
-  if (countInStock < 10) return { label: `Only ${countInStock} left`, className: "text-amber-600" };
-  return { label: "In stock", className: "text-emerald-600" };
-};
-
+// كارت التحميل (Skeleton) بيظهر مكان المنتج لحد ما البيانات توصل من السيرفر
 export function ProductCardSkeleton() {
   return (
-    <div className="animate-pulse overflow-hidden rounded-xl border border-slate-200 bg-white">
-      <div className="aspect-square bg-slate-200" />
-      <div className="flex flex-col gap-2 p-4">
-        <div className="h-3 w-1/3 rounded bg-slate-200" />
-        <div className="h-4 w-2/3 rounded bg-slate-200" />
-        <div className="h-3 w-full rounded bg-slate-200" />
-        <div className="h-8 w-full rounded bg-slate-200" />
+    <div className="card h-100 tw:animate-pulse">
+      <div className="tw:aspect-square bg-light tw:rounded-t-xl" />
+      <div className="card-body">
+        <div className="bg-light rounded mb-2" style={{ height: 12, width: "40%" }} />
+        <div className="bg-light rounded mb-2" style={{ height: 16, width: "80%" }} />
+        <div className="bg-light rounded" style={{ height: 32 }} />
       </div>
     </div>
   );
 }
 
-export default function ProductCard({ product, onAddToCart }) {
-  const stock = stockInfo(product.countInStock);
-  const filledStars = Math.round(product.rating);
+// كارت المنتج اللى بيظهر فى الصفحه الرئيسيه و المنتجات المميزه
+export default function ProductCard({ product }) {
+  // t للترجمه - tr لاختيار الاسم حسب اللغه - price لعرض السعر بالعمله المختاره
+  const { t, tr, price } = useI18n();
+  // داله الاضافه للسله (بتحول الزائر لتسجيل الدخول لو مش مسجل)
+  const addToCart = useAddToCart();
+
+  // هل المنتج خلص من المخزن؟
+  const outOfStock = product.countInStock === 0;
+  // عدد النجوم المليانه (التقييم مقرب لاقرب رقم صحيح)
+  const stars = Math.round(product.rating || 0);
 
   return (
-    <div className="group flex flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm transition-shadow hover:shadow-lg">
-      <Link to={`/products/${product.id}`} className="flex flex-1 flex-col">
-        <div className="relative aspect-square overflow-hidden bg-slate-100">
+    <div className="card h-100 card-hover tw:overflow-hidden">
+      {/* الصوره و الاسم لينك بيودى لصفحه تفاصيل المنتج */}
+      <Link to={`/products/${product.id}`} className="text-decoration-none text-reset d-flex flex-column flex-grow-1">
+        <div className="position-relative tw:aspect-square bg-light tw:overflow-hidden">
           <img
             src={resolveProductImage(product.image)}
-            alt={product.name}
-            className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+            alt={tr(product, "name")}
+            loading="lazy"
+            className="tw:h-full tw:w-full tw:object-cover tw:transition-transform tw:duration-300 tw:hover:scale-105"
           />
+          {/* علامه "مميز" لو المنتج isFeatured */}
           {product.isFeatured && (
-            <span className="absolute left-2 top-2 rounded-full bg-indigo-600 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-white shadow">
-              Featured
-            </span>
+            <span className="badge bg-warning text-dark position-absolute top-0 start-0 m-2">{t("product.featured")}</span>
+          )}
+          {/* علامه "نفذت الكميه" لو المخزن صفر */}
+          {outOfStock && (
+            <span className="badge bg-dark position-absolute top-0 end-0 m-2">{t("product.outOfStock")}</span>
           )}
         </div>
 
-        <div className="flex flex-1 flex-col gap-1.5 p-4 pb-0">
-          <div className="flex items-center justify-between gap-2 text-xs uppercase tracking-wide text-slate-500">
-            <span>{product.category}</span>
-            {product.brand && <span className="text-slate-400">{product.brand}</span>}
+        <div className="card-body d-flex flex-column gap-1 pb-0">
+          {/* التصنيف و البراند */}
+          <div className="d-flex justify-content-between small text-secondary">
+            <span>{tr(product, "category")}</span>
+            {product.brand && <span>{product.brand}</span>}
           </div>
-
-          <h3 className="truncate text-base font-semibold text-slate-900 group-hover:text-indigo-600">
-            {product.name}
-          </h3>
-
-          {product.description && (
-            <p className="line-clamp-2 text-sm text-slate-500">
-              {product.description}
-            </p>
-          )}
-
-          <div className="flex items-center gap-1.5 text-sm">
-            <span className="tracking-wide text-amber-400" aria-hidden="true">
-              {"★".repeat(filledStars)}
-              {"☆".repeat(5 - filledStars)}
-            </span>
-            <span className="text-slate-500">
-              {product.rating.toFixed(1)} ({product.numReviews})
-            </span>
+          {/* اسم المنتج (سطرين بالكتير) */}
+          <h3 className="h6 fw-bold mb-0 line-clamp-2">{tr(product, "name")}</h3>
+          {/* التقييم بالنجوم و عدد المراجعات */}
+          <div className="small">
+            <span className="text-warning" aria-hidden="true">
+              {"★".repeat(stars)}
+              {"☆".repeat(5 - stars)}
+            </span>{" "}
+            <span className="text-secondary">({product.numReviews || 0})</span>
           </div>
-
-          <div className="mt-auto flex items-center justify-between gap-2 pt-2">
-            <p className="text-lg font-bold text-indigo-600">
-              ${product.price.toFixed(2)}
-            </p>
-            <span className={`text-xs font-medium ${stock.className}`}>
-              {stock.label}
-            </span>
-          </div>
+          {/* السعر بالجنيه او الدولار حسب اختيار المستخدم */}
+          <p className="price fs-5 mt-auto mb-0 pt-1">{price(product.price)}</p>
         </div>
       </Link>
 
-      <div className="p-4 pt-2">
+      {/* زرار الاضافه للسله - بيتقفل لو المنتج خلص */}
+      <div className="card-body pt-2">
         <button
           type="button"
-          disabled={product.countInStock === 0}
-          onClick={() => onAddToCart && onAddToCart(product)}
-          className="w-full rounded-lg bg-indigo-600 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-400"
+          className="btn btn-primary w-100"
+          disabled={outOfStock}
+          onClick={() => addToCart(product)}
         >
-          {product.countInStock === 0 ? "Out of Stock" : "Add to Cart"}
+          <Icon name="cart" size={18} /> {outOfStock ? t("product.outOfStock") : t("product.addToCart")}
         </button>
       </div>
     </div>

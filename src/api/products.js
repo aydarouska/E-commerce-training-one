@@ -1,18 +1,17 @@
+// طلبات المنتجات من السيرفر
 import api from "./axios";
 
-
-//هى داله لحصول على جميع المنتجات من السيرفر و يتم استخدامها في صفحة المنتجات  و بعد ذلك يتم استخدامها في صفحة التصنيفات و 
+// كل المنتجات - params ممكن يكون فيها: { search, category, sort, page, limit, minPrice, maxPrice, featured }
 export const getProducts = (params = {}) => api.get("/products", { params });
-
-//هى داله لحصول على جميع التصنيفات من السيرفر و يتم استخدامها في صفحة المنتجات و 
-export const getCategories = () => api.get("/categories");
-
-
+// التصنيفات بالعربى و الانجليزى
+export const getCategories = () => api.get("/products/categories/list");
+// منتج واحد بالـ id
 export const getProductById = (id) => api.get(`/products/${id}`);
+// المنتجات المميزه (اول 8)
+export const getFeaturedProducts = () =>
+  api.get("/products", { params: { featured: true, limit: 8 } });
 
-export const getFeaturedProducts = () => api.get("/products", { params: { featured: true, limit: 4 } });
-
-export const getLatestProducts = () => api.get("/products", { params: { sort: "newest", limit: 5 } });
-
-// getProducts({ category: "Electronics" });
-// getProducts();
+// خاص بالادمن - data عباره عن FormData عشان نقدر نرفع صور
+export const createProduct = (data) => api.post("/products", data); // اضافه
+export const updateProduct = (id, data) => api.put(`/products/${id}`, data); // تعديل
+export const deleteProduct = (id) => api.delete(`/products/${id}`); // حذف
